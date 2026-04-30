@@ -127,8 +127,14 @@
   border-radius: 4px 18px 18px 18px;
   font-size: var(--text-sm);
   line-height: 1.7;
-  white-space: pre-wrap;
 }
+
+.msgText p { margin: 0 0 10px; }
+.msgText p:last-child { margin-bottom: 0; }
+.msgText strong { color: var(--color-cream); font-weight: 600; }
+.msgText em { font-style: italic; }
+.msgText ul, .msgText ol { margin: 0 0 10px; padding-left: 20px; }
+.msgText li { margin-bottom: 4px; }
 
 .typing {
   display: flex; gap: 5px; align-items: center;

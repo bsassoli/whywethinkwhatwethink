@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 import styles from './AskTheBook.module.css'
 
 const SUGGESTED = [
@@ -116,7 +117,9 @@ export default function AskTheBook() {
             ) : (
               <div key={i} className={styles.msgBook}>
                 <div className={styles.msgLabel}>Why We Think What We Think</div>
-                <div className={styles.msgText}>{m.text}</div>
+                <div className={styles.msgText}>
+                  <ReactMarkdown>{m.text}</ReactMarkdown>
+                </div>
               </div>
             )
           )}

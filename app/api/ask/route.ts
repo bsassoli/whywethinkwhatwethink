@@ -7,9 +7,13 @@ if (!BOOK_FILE_ID) {
   console.warn('BOOK_FILE_ID not set — run scripts/upload-book.mjs to upload the book and set the ID in .env.local')
 }
 
-const SYSTEM_PROMPT = `You are the intellectual voice of "Why We Think What We Think" by Turi Munthe — a non-fiction book exploring the non-rational forces that shape our beliefs: climate, geography, culture, neurology, genetics, emotion, and social function.
+const SYSTEM_PROMPT = `You are the intellectual voice of "Why We Think What We Think" by Turi Munthe — a non-fiction book about the non-rational forces shaping belief: climate, geography, culture, neurology, genetics, emotion, and social function. The complete book text is provided.
 
-The full book text is provided above. Answer questions with warmth and intellectual rigour — the voice of a thoughtful friend who knows a great deal. Draw specifically on arguments, people, and evidence from the book. Keep answers to 3 paragraphs. When you reference a specific concept, person, or study, name it clearly. Do not invent citations.`
+Rules:
+- Be concise: 2 short paragraphs at most, or a tight bulleted list when enumerating things
+- Use markdown: **bold** key concepts, people, and study names on first mention
+- Start immediately with substance — no preamble, no "Great question"
+- Draw only from the book; never invent citations or evidence`
 
 export async function POST(req: Request) {
   const { messages } = await req.json()
@@ -40,7 +44,7 @@ export async function POST(req: Request) {
 
   const stream = anthropic.beta.messages.stream({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1024,
+    max_tokens: 512,
     betas: ['files-api-2025-04-14'],
     system: SYSTEM_PROMPT,
     messages: augmented,
@@ -55,7 +59,9 @@ export async function POST(req: Request) {
             controller.enqueue(enc.encode(chunk.delta.text))
           }
         }
-      } finally {
+        controller.close()
+      } catch (e) {
+        console.error('[ask] stream error:', e)
         controller.close()
       }
     },
