@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import styles from './Forces.module.css'
 
@@ -112,6 +113,9 @@ function ForceDetail({ force }: { force: typeof FORCES[0] }) {
             {ex.body}
           </div>
         ))}
+        <Link href="/explore" className={styles.exploreLink}>
+          Explore related ideas in the graph →
+        </Link>
       </div>
     </div>
   )

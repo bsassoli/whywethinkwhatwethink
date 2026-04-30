@@ -16,6 +16,21 @@ export interface GraphNode {
   name: string
   type: PageType
   val: number
+  excerpt: string
+}
+
+function makeExcerpt(content: string): string {
+  const para = content
+    .split('\n\n')
+    .find(p => {
+      const t = p.trim()
+      return t && !t.startsWith('#') && !t.startsWith('-') && !t.startsWith('|') && !t.startsWith('---') && !t.startsWith('**Who')
+    }) ?? ''
+  return para
+    .replace(/\[\[([^\]]+)\]\]/g, '$1')
+    .replace(/[*_`]/g, '')
+    .trim()
+    .slice(0, 240)
 }
 
 export interface GraphLink {
@@ -75,6 +90,7 @@ export function buildGraphData(): GraphData {
     name: p.title,
     type: p.type,
     val: Math.max(1, connectionCount.get(p.slug) ?? 1),
+    excerpt: makeExcerpt(p.content),
   }))
 
   return { nodes, links }

@@ -27,8 +27,14 @@ const ACTIVE_TYPES: Record<PageType, boolean> = {
   chapter: true, concept: true, person: true, study: true,
 }
 
+interface Connection {
+  id: string
+  name: string
+  type: PageType
+}
+
 interface SelectedNode extends GraphNode {
-  connections: string[]
+  connections: Connection[]
 }
 
 export default function GraphExplorer({ data }: { data: GraphData }) {
@@ -36,6 +42,7 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
   const [activeTypes, setActiveTypes] = useState({ ...ACTIVE_TYPES })
   const [dims, setDims] = useState({ w: 1200, h: 800 })
   const containerRef = useRef<HTMLDivElement>(null)
+  const graphRef = useRef<any>(null)
 
   useEffect(() => {
     const measure = () => {
@@ -51,13 +58,29 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
   const filteredData = {
     nodes: data.nodes.filter(n => activeTypes[n.type]),
     links: data.links.filter(l => {
-      const s = data.nodes.find(n => n.id === (typeof l.source === 'string' ? l.source : (l.source as GraphNode).id))
-      const t = data.nodes.find(n => n.id === (typeof l.target === 'string' ? l.target : (l.target as GraphNode).id))
+      const sid = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id
+      const tid = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id
+      const s = data.nodes.find(n => n.id === sid)
+      const t = data.nodes.find(n => n.id === tid)
       return s && t && activeTypes[s.type] && activeTypes[t.type]
     })
   }
 
-  const handleNodeClick = useCallback((node: GraphNode) => {
+  const flyToNode = useCallback((nodeId: string) => {
+    if (!graphRef.current) return
+    const node = filteredData.nodes.find(n => n.id === nodeId) as any
+    if (!node) return
+    const { x = 0, y = 0, z = 0 } = node
+    const mag = Math.sqrt(x * x + y * y + z * z) || 1
+    const dist = 180
+    graphRef.current.cameraPosition(
+      { x: x + (x / mag) * dist, y: y + (y / mag) * dist, z: z + (z / mag) * dist },
+      { x, y, z },
+      1200
+    )
+  }, [filteredData.nodes])
+
+  const selectNode = useCallback((node: GraphNode) => {
     const connections = data.links
       .filter(l => {
         const sid = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id
@@ -67,12 +90,27 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
       .map(l => {
         const sid = typeof l.source === 'string' ? l.source : (l.source as GraphNode).id
         const tid = typeof l.target === 'string' ? l.target : (l.target as GraphNode).id
-        return sid === node.id ? tid : sid
+        const peerId = sid === node.id ? tid : sid
+        const peer = data.nodes.find(n => n.id === peerId)
+        return peer ? { id: peer.id, name: peer.name, type: peer.type } : null
       })
-      .map(id => data.nodes.find(n => n.id === id)?.name ?? id)
+      .filter((c): c is Connection => c !== null)
+      .sort((a, b) => a.name.localeCompare(b.name))
 
     setSelected({ ...node, connections })
   }, [data])
+
+  const handleNodeClick = useCallback((node: any) => {
+    selectNode(node as GraphNode)
+    flyToNode(node.id)
+  }, [selectNode, flyToNode])
+
+  const handleConnectionClick = (conn: Connection) => {
+    const node = data.nodes.find(n => n.id === conn.id)
+    if (!node) return
+    selectNode(node)
+    flyToNode(conn.id)
+  }
 
   const toggleType = (t: PageType) => {
     setActiveTypes(prev => ({ ...prev, [t]: !prev[t] }))
@@ -99,6 +137,7 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
 
       <div ref={containerRef} className={styles.canvas}>
         <ForceGraph3D
+          ref={graphRef}
           graphData={filteredData as any}
           width={dims.w}
           height={dims.h}
@@ -112,7 +151,7 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
           linkDirectionalParticles={2}
           linkDirectionalParticleSpeed={0.003}
           linkDirectionalParticleColor={() => 'rgba(200,49,42,0.6)'}
-          onNodeClick={(n: any) => handleNodeClick(n)}
+          onNodeClick={handleNodeClick}
           enableNodeDrag={false}
         />
       </div>
@@ -120,15 +159,28 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
       {selected && (
         <div className={styles.panel}>
           <button className={styles.close} onClick={() => setSelected(null)} aria-label="Close">×</button>
-          <div className={styles.panelType}>{TYPE_LABELS[selected.type]}</div>
+          <div className={styles.panelType}>
+            <span className={styles.typeDot} style={{ background: NODE_COLORS[selected.type] }} />
+            {TYPE_LABELS[selected.type]}
+          </div>
           <h2 className={styles.panelTitle}>{selected.name}</h2>
+          {selected.excerpt && (
+            <p className={styles.panelExcerpt}>{selected.excerpt}</p>
+          )}
           <div className={styles.panelConnections}>
             <div className={styles.panelConnLabel}>
-              {selected.connections.length} connections
+              {selected.connections.length} connections — click to explore
             </div>
             <div className={styles.connList}>
-              {selected.connections.map((c, i) => (
-                <span key={i} className={styles.connTag}>{c}</span>
+              {selected.connections.map((c) => (
+                <button
+                  key={c.id}
+                  className={styles.connTag}
+                  onClick={() => handleConnectionClick(c)}
+                  style={{ borderLeftColor: NODE_COLORS[c.type] }}
+                >
+                  {c.name}
+                </button>
               ))}
             </div>
           </div>
