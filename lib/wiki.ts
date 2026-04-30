@@ -1,9 +1,4 @@
-import fs from 'fs'
-import path from 'path'
-import matter from 'gray-matter'
-
-const WIKI_DIR = path.join(process.cwd(), '..', 'wiki')
-const SUBDIRS = ['chapters', 'concepts', 'people', 'studies'] as const
+import rawPages from './wiki-data.json'
 
 export type PageType = 'chapter' | 'concept' | 'person' | 'study'
 
@@ -20,7 +15,7 @@ export interface GraphNode {
   id: string
   name: string
   type: PageType
-  val: number  // node size (connection count)
+  val: number
 }
 
 export interface GraphLink {
@@ -37,36 +32,12 @@ function extractWikilinks(content: string): string[] {
   const links: string[] = []
   const regex = /\[\[([^\]]+)\]\]/g
   let match
-  while ((match = regex.exec(content)) !== null) {
-    links.push(match[1])
-  }
+  while ((match = regex.exec(content)) !== null) links.push(match[1])
   return [...new Set(links)]
 }
 
 export function getAllPages(): WikiPage[] {
-  const pages: WikiPage[] = []
-  for (const subdir of SUBDIRS) {
-    const dir = path.join(WIKI_DIR, subdir)
-    if (!fs.existsSync(dir)) continue
-    const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'))
-    for (const file of files) {
-      const raw = fs.readFileSync(path.join(dir, file), 'utf-8')
-      const { data, content } = matter(raw)
-      const slug = file.replace(/\.md$/, '')
-      const typeMap: Record<string, PageType> = {
-        chapters: 'chapter', concepts: 'concept', people: 'person', studies: 'study'
-      }
-      pages.push({
-        slug,
-        type: (data.type as PageType) ?? typeMap[subdir],
-        title: slug.replace(/^\d{2} - /, ''),
-        tags: data.tags ?? [],
-        chapters: data.chapters ?? [],
-        content,
-      })
-    }
-  }
-  return pages
+  return rawPages as WikiPage[]
 }
 
 export function getPage(slug: string): WikiPage | undefined {
@@ -76,11 +47,10 @@ export function getPage(slug: string): WikiPage | undefined {
 export function buildGraphData(): GraphData {
   const pages = getAllPages()
   const slugIndex = new Map(pages.map(p => [p.slug, p]))
-  // also index by title for wikilinks that use the short title
   const titleIndex = new Map(pages.map(p => [p.title, p]))
 
-  function resolve(linkText: string): WikiPage | undefined {
-    return slugIndex.get(linkText) ?? titleIndex.get(linkText)
+  function resolve(link: string): WikiPage | undefined {
+    return slugIndex.get(link) ?? titleIndex.get(link)
   }
 
   const edgeSet = new Set<string>()
@@ -111,8 +81,7 @@ export function buildGraphData(): GraphData {
 }
 
 export function getAllWikiContext(): string {
-  const pages = getAllPages()
-  return pages
+  return getAllPages()
     .map(p => `### [${p.type.toUpperCase()}] ${p.title}\n${p.content}`)
     .join('\n\n---\n\n')
 }
