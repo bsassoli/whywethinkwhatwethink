@@ -1,7 +1,8 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import type { GraphData, GraphNode, GraphLink, PageType } from '@/lib/wiki'
+import * as THREE from 'three'
+import type { GraphData, GraphNode, PageType } from '@/lib/wiki'
 import styles from './GraphExplorer.module.css'
 
 const ForceGraph3D = dynamic(() => import('react-force-graph-3d'), {
@@ -9,46 +10,90 @@ const ForceGraph3D = dynamic(() => import('react-force-graph-3d'), {
   loading: () => <div className={styles.loading}>Building the knowledge graph…</div>
 })
 
-const NODE_COLORS: Record<PageType, string> = {
-  chapter: '#C8312A',
-  concept: '#D4A853',
-  person:  '#F4EDD8',
-  study:   '#8FAE9B',
-}
-
 const TYPE_LABELS: Record<PageType, string> = {
-  chapter: 'Chapter',
-  concept: 'Concept',
-  person:  'Person',
-  study:   'Study',
+  chapter: 'Chapter', concept: 'Concept', person: 'Person', study: 'Study',
 }
 
 const ACTIVE_TYPES: Record<PageType, boolean> = {
   chapter: true, concept: true, person: true, study: true,
 }
 
-interface Connection {
+interface ThemeDef {
   id: string
-  name: string
-  type: PageType
+  label: string
+  background: string
+  linkColor: string
+  linkWidth: number
+  particleColor: string
+  nodeColors: Record<PageType, string>
+  labelColor: string
 }
 
-interface SelectedNode extends GraphNode {
-  connections: Connection[]
+const THEMES: ThemeDef[] = [
+  {
+    id: 'ink', label: 'Ink',
+    background: '#1A1714',
+    linkColor: 'rgba(244,237,216,0.30)',
+    linkWidth: 1,
+    particleColor: '#C8312A',
+    nodeColors: { chapter: '#C8312A', concept: '#D4A853', person: '#F4EDD8', study: '#8FAE9B' },
+    labelColor: 'rgba(244,237,216,0.90)',
+  },
+  {
+    id: 'neural', label: 'Neural',
+    background: '#080B14',
+    linkColor: 'rgba(80,140,255,0.25)',
+    linkWidth: 1.2,
+    particleColor: '#40E0FF',
+    nodeColors: { chapter: '#FF4466', concept: '#FFD94D', person: '#80C8FF', study: '#44FFAA' },
+    labelColor: 'rgba(180,220,255,0.90)',
+  },
+  {
+    id: 'cosmos', label: 'Cosmos',
+    background: '#050508',
+    linkColor: 'rgba(180,160,255,0.18)',
+    linkWidth: 0.8,
+    particleColor: '#C8A8FF',
+    nodeColors: { chapter: '#FF8080', concept: '#FFDD80', person: '#FFFFFF', study: '#80FFCC' },
+    labelColor: 'rgba(255,255,255,0.85)',
+  },
+]
+
+function makeTextSprite(text: string, color: string): THREE.Sprite {
+  const canvas = document.createElement('canvas')
+  canvas.width = 512
+  canvas.height = 64
+  const ctx = canvas.getContext('2d')!
+  ctx.font = '500 22px system-ui, sans-serif'
+  ctx.fillStyle = color
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text.length > 24 ? text.slice(0, 22) + '…' : text, 256, 32)
+  const texture = new THREE.CanvasTexture(canvas)
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false })
+  const sprite = new THREE.Sprite(material)
+  sprite.scale.set(40, 5, 1)
+  sprite.position.set(0, 10, 0)
+  return sprite
 }
+
+interface Connection { id: string; name: string; type: PageType }
+interface SelectedNode extends GraphNode { connections: Connection[] }
 
 export default function GraphExplorer({ data }: { data: GraphData }) {
   const [selected, setSelected] = useState<SelectedNode | null>(null)
   const [activeTypes, setActiveTypes] = useState({ ...ACTIVE_TYPES })
   const [dims, setDims] = useState({ w: 1200, h: 800 })
+  const [themeIdx, setThemeIdx] = useState(0)
+  const [showLabels, setShowLabels] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const graphRef = useRef<any>(null)
+  const theme = THEMES[themeIdx]
 
   useEffect(() => {
     const measure = () => {
-      if (containerRef.current) {
+      if (containerRef.current)
         setDims({ w: containerRef.current.clientWidth, h: containerRef.current.clientHeight })
-      }
     }
     measure()
     window.addEventListener('resize', measure)
@@ -63,7 +108,7 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
       const s = data.nodes.find(n => n.id === sid)
       const t = data.nodes.find(n => n.id === tid)
       return s && t && activeTypes[s.type] && activeTypes[t.type]
-    })
+    }),
   }
 
   const flyToNode = useCallback((nodeId: string) => {
@@ -96,7 +141,6 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
       })
       .filter((c): c is Connection => c !== null)
       .sort((a, b) => a.name.localeCompare(b.name))
-
     setSelected({ ...node, connections })
   }, [data])
 
@@ -112,9 +156,9 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
     flyToNode(conn.id)
   }
 
-  const toggleType = (t: PageType) => {
-    setActiveTypes(prev => ({ ...prev, [t]: !prev[t] }))
-  }
+  const nodeThreeObject = useCallback((node: any) => {
+    return makeTextSprite(node.name, theme.labelColor)
+  }, [theme.labelColor])
 
   return (
     <div className={styles.root}>
@@ -124,12 +168,29 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
           <button
             key={t}
             className={`${styles.filterBtn} ${!activeTypes[t] ? styles.inactive : ''}`}
-            onClick={() => toggleType(t)}
+            onClick={() => setActiveTypes(prev => ({ ...prev, [t]: !prev[t] }))}
           >
-            <span className={styles.dot} style={{ background: NODE_COLORS[t] }} />
+            <span className={styles.dot} style={{ background: theme.nodeColors[t] }} />
             {TYPE_LABELS[t]}
           </button>
         ))}
+
+        <div className={styles.divider} />
+
+        <div className={styles.controlsTitle}>Theme</div>
+        <div className={styles.themeRow}>
+          <button className={styles.themeArrow} onClick={() => setThemeIdx(i => (i + THEMES.length - 1) % THEMES.length)}>‹</button>
+          <span className={styles.themeName}>{theme.label}</span>
+          <button className={styles.themeArrow} onClick={() => setThemeIdx(i => (i + 1) % THEMES.length)}>›</button>
+        </div>
+
+        <button
+          className={`${styles.labelToggle} ${showLabels ? styles.labelToggleOn : ''}`}
+          onClick={() => setShowLabels(v => !v)}
+        >
+          {showLabels ? '— hide labels' : '+ show labels'}
+        </button>
+
         <div className={styles.nodeCount}>
           {filteredData.nodes.length} nodes · {filteredData.links.length} connections
         </div>
@@ -141,16 +202,18 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
           graphData={filteredData as any}
           width={dims.w}
           height={dims.h}
-          backgroundColor="#1A1714"
+          backgroundColor={theme.background}
           nodeLabel="name"
-          nodeColor={(n: any) => NODE_COLORS[n.type as PageType] ?? '#F4EDD8'}
+          nodeColor={(n: any) => theme.nodeColors[n.type as PageType] ?? '#F4EDD8'}
           nodeVal={(n: any) => Math.max(1, n.val)}
           nodeRelSize={4}
-          linkColor={() => 'rgba(244,237,216,0.12)'}
-          linkWidth={0.5}
+          nodeThreeObjectExtend={showLabels}
+          nodeThreeObject={showLabels ? nodeThreeObject : undefined}
+          linkColor={() => theme.linkColor}
+          linkWidth={theme.linkWidth}
           linkDirectionalParticles={2}
           linkDirectionalParticleSpeed={0.003}
-          linkDirectionalParticleColor={() => 'rgba(200,49,42,0.6)'}
+          linkDirectionalParticleColor={() => theme.particleColor}
           onNodeClick={handleNodeClick}
           enableNodeDrag={false}
         />
@@ -160,24 +223,22 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
         <div className={styles.panel}>
           <button className={styles.close} onClick={() => setSelected(null)} aria-label="Close">×</button>
           <div className={styles.panelType}>
-            <span className={styles.typeDot} style={{ background: NODE_COLORS[selected.type] }} />
+            <span className={styles.typeDot} style={{ background: theme.nodeColors[selected.type] }} />
             {TYPE_LABELS[selected.type]}
           </div>
           <h2 className={styles.panelTitle}>{selected.name}</h2>
-          {selected.excerpt && (
-            <p className={styles.panelExcerpt}>{selected.excerpt}</p>
-          )}
+          {selected.excerpt && <p className={styles.panelExcerpt}>{selected.excerpt}</p>}
           <div className={styles.panelConnections}>
             <div className={styles.panelConnLabel}>
               {selected.connections.length} connections — click to explore
             </div>
             <div className={styles.connList}>
-              {selected.connections.map((c) => (
+              {selected.connections.map(c => (
                 <button
                   key={c.id}
                   className={styles.connTag}
                   onClick={() => handleConnectionClick(c)}
-                  style={{ borderLeftColor: NODE_COLORS[c.type] }}
+                  style={{ borderLeftColor: theme.nodeColors[c.type] }}
                 >
                   {c.name}
                 </button>
@@ -188,7 +249,7 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
       )}
 
       <div className={styles.hint}>
-        Click any node to explore · Red particles show connections
+        Click any node to explore · Particles show connections
       </div>
     </div>
   )
