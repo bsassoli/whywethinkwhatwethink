@@ -30,7 +30,7 @@ interface ThemeDef {
   nodeColors: Record<PageType, string>
   labelColor: string
   labelBg: string
-  nodeStyle: 'sphere' | 'octahedron' | 'icosahedron'
+  nodeStyle: 'sphere' | 'octahedron' | 'tetrahedron'
 }
 
 const THEMES: ThemeDef[] = [
@@ -61,19 +61,84 @@ const THEMES: ThemeDef[] = [
     nodeStyle: 'octahedron',
   },
   {
-    id: 'cosmos', label: 'Cosmos',
-    background: '#050508',
-    linkColor: 'rgba(200,160,255,0.55)',
-    linkWidth: 1.5,
-    particleColor: '#C8A8FF',
+    id: 'alchemic', label: 'Alchemic',
+    background: '#120E08',
+    linkColor: 'rgba(210,160,55,0.62)',
+    linkWidth: 1.8,
+    particleColor: '#FFB830',
     particleCount: 2,
-    particleSpeed: 0.002,
-    nodeColors: { chapter: '#FF8080', concept: '#FFDD80', person: '#FFFFFF', study: '#80FFCC' },
-    labelColor: '#FFFFFF',
-    labelBg: 'rgba(5,5,8,0.78)',
-    nodeStyle: 'icosahedron',
+    particleSpeed: 0.003,
+    nodeColors: { chapter: '#C8312A', concept: '#D4A030', person: '#C8C4A8', study: '#6B9B7A' },
+    labelColor: '#F4E8C0',
+    labelBg: 'rgba(18,14,8,0.85)',
+    nodeStyle: 'tetrahedron',
   },
 ]
+
+function buildThemeBg(themeId: string): THREE.Object3D | null {
+  if (themeId === 'neural') {
+    const group = new THREE.Group()
+    group.name = 'theme-bg'
+
+    // Dense dim background neuron field
+    const count = 700
+    const geo = new THREE.BufferGeometry()
+    const pos = new Float32Array(count * 3)
+    for (let i = 0; i < count; i++) {
+      const r = 280 + Math.random() * 380
+      const theta = Math.random() * Math.PI * 2
+      const phi = Math.acos(2 * Math.random() - 1)
+      pos[i * 3] = r * Math.sin(phi) * Math.cos(theta)
+      pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
+      pos[i * 3 + 2] = r * Math.cos(phi)
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    group.add(new THREE.Points(geo,
+      new THREE.PointsMaterial({ color: '#1A4A80', size: 2, transparent: true, opacity: 0.45, sizeAttenuation: true })))
+
+    // Brighter accent neurons scattered closer
+    const count2 = 140
+    const geo2 = new THREE.BufferGeometry()
+    const pos2 = new Float32Array(count2 * 3)
+    for (let i = 0; i < count2; i++) {
+      const r = 200 + Math.random() * 460
+      const theta = Math.random() * Math.PI * 2
+      const phi = Math.acos(2 * Math.random() - 1)
+      pos2[i * 3] = r * Math.sin(phi) * Math.cos(theta)
+      pos2[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
+      pos2[i * 3 + 2] = r * Math.cos(phi)
+    }
+    geo2.setAttribute('position', new THREE.BufferAttribute(pos2, 3))
+    group.add(new THREE.Points(geo2,
+      new THREE.PointsMaterial({ color: '#40C0FF', size: 3, transparent: true, opacity: 0.60, sizeAttenuation: true })))
+
+    return group
+  }
+
+  if (themeId === 'alchemic') {
+    const group = new THREE.Group()
+    group.name = 'theme-bg'
+
+    const count = 350
+    const geo = new THREE.BufferGeometry()
+    const pos = new Float32Array(count * 3)
+    for (let i = 0; i < count; i++) {
+      const r = 220 + Math.random() * 440
+      const theta = Math.random() * Math.PI * 2
+      const phi = Math.acos(2 * Math.random() - 1)
+      pos[i * 3] = r * Math.sin(phi) * Math.cos(theta)
+      pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
+      pos[i * 3 + 2] = r * Math.cos(phi)
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    group.add(new THREE.Points(geo,
+      new THREE.PointsMaterial({ color: '#A06010', size: 1.5, transparent: true, opacity: 0.35, sizeAttenuation: true })))
+
+    return group
+  }
+
+  return null
+}
 
 function makeTextSprite(text: string, color: string, bgColor: string): THREE.Sprite {
   const canvas = document.createElement('canvas')
@@ -127,8 +192,8 @@ function makeNodeMesh(node: any, theme: ThemeDef): THREE.Object3D {
     const mat = new THREE.MeshBasicMaterial({ color, wireframe: true })
     return new THREE.Mesh(geo, mat)
   }
-  if (theme.nodeStyle === 'icosahedron') {
-    const geo = new THREE.IcosahedronGeometry(size * 0.85, 0)
+  if (theme.nodeStyle === 'tetrahedron') {
+    const geo = new THREE.TetrahedronGeometry(size * 1.1, 0)
     const mat = new THREE.MeshBasicMaterial({ color, wireframe: true })
     return new THREE.Mesh(geo, mat)
   }
@@ -146,8 +211,11 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
   const [dims, setDims] = useState({ w: 1200, h: 800 })
   const [themeIdx, setThemeIdx] = useState(0)
   const [showLabels, setShowLabels] = useState(false)
+  const [showLinks, setShowLinks] = useState(true)
+  const [graphReady, setGraphReady] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const graphRef = useRef<any>(null)
+  const bgObjRef = useRef<THREE.Object3D | null>(null)
   const theme = THEMES[themeIdx]
 
   useEffect(() => {
@@ -159,6 +227,43 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
   }, [])
+
+  // Build / swap background scene objects when theme changes or graph becomes ready
+  useEffect(() => {
+    if (!graphReady || !graphRef.current) return
+    const scene = graphRef.current.scene()
+
+    // Remove previous
+    const prev = scene.getObjectByName('theme-bg')
+    if (prev) scene.remove(prev)
+    bgObjRef.current = null
+
+    const bg = buildThemeBg(theme.id)
+    if (bg) {
+      scene.add(bg)
+      bgObjRef.current = bg
+    }
+
+    return () => {
+      const obj = scene.getObjectByName('theme-bg')
+      if (obj) scene.remove(obj)
+    }
+  }, [graphReady, theme.id])
+
+  // Slowly rotate neural background
+  useEffect(() => {
+    if (theme.id !== 'neural') return
+    let id: number
+    const tick = () => {
+      if (bgObjRef.current) {
+        bgObjRef.current.rotation.y += 0.0003
+        bgObjRef.current.rotation.x += 0.00012
+      }
+      id = requestAnimationFrame(tick)
+    }
+    id = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(id)
+  }, [theme.id])
 
   const filteredData = {
     nodes: data.nodes.filter(n => activeTypes[n.type]),
@@ -249,11 +354,20 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
           <button className={styles.themeArrow} onClick={() => setThemeIdx(i => (i + 1) % THEMES.length)}>›</button>
         </div>
 
+        <div className={styles.divider} />
+
         <button
           className={`${styles.labelToggle} ${showLabels ? styles.labelToggleOn : ''}`}
           onClick={() => setShowLabels(v => !v)}
         >
           {showLabels ? '— hide labels' : '+ show labels'}
+        </button>
+
+        <button
+          className={`${styles.labelToggle} ${showLinks ? styles.labelToggleOn : ''}`}
+          onClick={() => setShowLinks(v => !v)}
+        >
+          {showLinks ? '— hide connectors' : '+ show connectors'}
         </button>
 
         <div className={styles.nodeCount}>
@@ -274,12 +388,14 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
           nodeRelSize={4}
           nodeThreeObjectExtend={false}
           nodeThreeObject={nodeThreeObject}
+          linkVisibility={() => showLinks}
           linkColor={() => theme.linkColor}
           linkWidth={theme.linkWidth}
-          linkDirectionalParticles={theme.particleCount}
+          linkDirectionalParticles={showLinks ? theme.particleCount : 0}
           linkDirectionalParticleSpeed={theme.particleSpeed}
           linkDirectionalParticleColor={() => theme.particleColor}
           onNodeClick={handleNodeClick}
+          onEngineStop={() => setGraphReady(true)}
           enableNodeDrag={false}
         />
       </div>
