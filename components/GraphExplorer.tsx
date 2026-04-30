@@ -135,14 +135,8 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
         </div>
       )}
 
-      <div className={styles.legend}>
-        {(Object.keys(NODE_COLORS) as PageType[]).map(t => (
-          <div key={t} className={styles.legendItem}>
-            <span className={styles.legendDot} style={{ background: NODE_COLORS[t] }} />
-            {TYPE_LABELS[t]}
-          </div>
-        ))}
-        <div className={styles.legendHint}>Click any node to explore · Red particles show connections</div>
+      <div className={styles.hint}>
+        Click any node to explore · Red particles show connections
       </div>
     </div>
   )

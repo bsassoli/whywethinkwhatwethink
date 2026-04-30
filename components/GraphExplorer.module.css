@@ -159,40 +159,15 @@
   color: var(--color-cream);
 }
 
-/* Legend (bottom-center) */
-.legend {
+.hint {
   position: absolute;
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  background: rgba(26,23,20,0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(244,237,216,0.08);
-  border-radius: var(--radius-pill);
-  padding: 12px 24px;
-}
-
-.legendItem {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   font-size: var(--text-xs);
-  color: rgba(244,237,216,0.6);
-}
-
-.legendDot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-}
-
-.legendHint {
-  font-size: var(--text-2xs);
   color: rgba(244,237,216,0.3);
   letter-spacing: 0.04em;
-  padding-left: 16px;
-  border-left: 1px solid rgba(244,237,216,0.1);
+  white-space: nowrap;
+  pointer-events: none;
 }

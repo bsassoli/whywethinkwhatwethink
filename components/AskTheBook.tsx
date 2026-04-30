@@ -23,6 +23,7 @@ export default function AskTheBook() {
   const [loading, setLoading] = useState(false)
   const msgEnd = useRef<HTMLDivElement>(null)
   const ref = useRef<HTMLDivElement>(null)
+  const hasInteracted = useRef(false)
 
   useEffect(() => {
     const obs = new IntersectionObserver(
@@ -34,12 +35,14 @@ export default function AskTheBook() {
   }, [])
 
   useEffect(() => {
+    if (!hasInteracted.current) return
     msgEnd.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [messages, loading])
 
   const send = async (q?: string) => {
     const question = q ?? input.trim()
     if (!question || loading) return
+    hasInteracted.current = true
     setInput('')
     setMessages(prev => [...prev, { role: 'user', text: question }])
     setLoading(true)
