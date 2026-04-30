@@ -25,56 +25,116 @@ interface ThemeDef {
   linkColor: string
   linkWidth: number
   particleColor: string
+  particleCount: number
+  particleSpeed: number
   nodeColors: Record<PageType, string>
   labelColor: string
+  labelBg: string
+  nodeStyle: 'sphere' | 'octahedron' | 'icosahedron'
 }
 
 const THEMES: ThemeDef[] = [
   {
     id: 'ink', label: 'Ink',
     background: '#1A1714',
-    linkColor: 'rgba(244,237,216,0.30)',
-    linkWidth: 1,
+    linkColor: 'rgba(244,237,216,0.65)',
+    linkWidth: 2,
     particleColor: '#C8312A',
+    particleCount: 2,
+    particleSpeed: 0.004,
     nodeColors: { chapter: '#C8312A', concept: '#D4A853', person: '#F4EDD8', study: '#8FAE9B' },
-    labelColor: 'rgba(244,237,216,0.90)',
+    labelColor: '#F4EDD8',
+    labelBg: 'rgba(20,18,16,0.82)',
+    nodeStyle: 'sphere',
   },
   {
     id: 'neural', label: 'Neural',
     background: '#080B14',
-    linkColor: 'rgba(80,140,255,0.25)',
-    linkWidth: 1.2,
+    linkColor: 'rgba(80,180,255,0.75)',
+    linkWidth: 2,
     particleColor: '#40E0FF',
+    particleCount: 3,
+    particleSpeed: 0.006,
     nodeColors: { chapter: '#FF4466', concept: '#FFD94D', person: '#80C8FF', study: '#44FFAA' },
-    labelColor: 'rgba(180,220,255,0.90)',
+    labelColor: '#C0E8FF',
+    labelBg: 'rgba(8,11,20,0.82)',
+    nodeStyle: 'octahedron',
   },
   {
     id: 'cosmos', label: 'Cosmos',
     background: '#050508',
-    linkColor: 'rgba(180,160,255,0.18)',
-    linkWidth: 0.8,
+    linkColor: 'rgba(200,160,255,0.55)',
+    linkWidth: 1.5,
     particleColor: '#C8A8FF',
+    particleCount: 2,
+    particleSpeed: 0.002,
     nodeColors: { chapter: '#FF8080', concept: '#FFDD80', person: '#FFFFFF', study: '#80FFCC' },
-    labelColor: 'rgba(255,255,255,0.85)',
+    labelColor: '#FFFFFF',
+    labelBg: 'rgba(5,5,8,0.78)',
+    nodeStyle: 'icosahedron',
   },
 ]
 
-function makeTextSprite(text: string, color: string): THREE.Sprite {
+function makeTextSprite(text: string, color: string, bgColor: string): THREE.Sprite {
   const canvas = document.createElement('canvas')
   canvas.width = 512
-  canvas.height = 64
+  canvas.height = 80
   const ctx = canvas.getContext('2d')!
-  ctx.font = '500 22px system-ui, sans-serif'
+
+  ctx.font = 'bold 28px system-ui, sans-serif'
+  const label = text.length > 22 ? text.slice(0, 20) + '…' : text
+  const tw = ctx.measureText(label).width
+  const pad = 14
+  const rx = (512 - tw) / 2 - pad
+  const rw = tw + pad * 2
+  const ry = 12
+  const rh = 54
+  const r = 8
+
+  ctx.fillStyle = bgColor
+  ctx.beginPath()
+  ctx.moveTo(rx + r, ry)
+  ctx.lineTo(rx + rw - r, ry)
+  ctx.arcTo(rx + rw, ry, rx + rw, ry + r, r)
+  ctx.lineTo(rx + rw, ry + rh - r)
+  ctx.arcTo(rx + rw, ry + rh, rx + rw - r, ry + rh, r)
+  ctx.lineTo(rx + r, ry + rh)
+  ctx.arcTo(rx, ry + rh, rx, ry + rh - r, r)
+  ctx.lineTo(rx, ry + r)
+  ctx.arcTo(rx, ry, rx + r, ry, r)
+  ctx.closePath()
+  ctx.fill()
+
   ctx.fillStyle = color
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText(text.length > 24 ? text.slice(0, 22) + '…' : text, 256, 32)
+  ctx.fillText(label, 256, 40)
+
   const texture = new THREE.CanvasTexture(canvas)
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false })
   const sprite = new THREE.Sprite(material)
-  sprite.scale.set(40, 5, 1)
-  sprite.position.set(0, 10, 0)
+  sprite.scale.set(54, 10, 1)
+  sprite.position.set(0, 15, 0)
   return sprite
+}
+
+function makeNodeMesh(node: any, theme: ThemeDef): THREE.Object3D {
+  const color = new THREE.Color(theme.nodeColors[node.type as PageType] ?? '#F4EDD8')
+  const size = Math.min(10, Math.max(3, 3.5 * Math.cbrt(node.val || 1)))
+
+  if (theme.nodeStyle === 'octahedron') {
+    const geo = new THREE.OctahedronGeometry(size, 0)
+    const mat = new THREE.MeshBasicMaterial({ color, wireframe: true })
+    return new THREE.Mesh(geo, mat)
+  }
+  if (theme.nodeStyle === 'icosahedron') {
+    const geo = new THREE.IcosahedronGeometry(size * 0.85, 0)
+    const mat = new THREE.MeshBasicMaterial({ color, wireframe: true })
+    return new THREE.Mesh(geo, mat)
+  }
+  const geo = new THREE.SphereGeometry(size * 0.75, 14, 14)
+  const mat = new THREE.MeshBasicMaterial({ color })
+  return new THREE.Mesh(geo, mat)
 }
 
 interface Connection { id: string; name: string; type: PageType }
@@ -157,8 +217,13 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
   }
 
   const nodeThreeObject = useCallback((node: any) => {
-    return makeTextSprite(node.name, theme.labelColor)
-  }, [theme.labelColor])
+    const group = new THREE.Group()
+    group.add(makeNodeMesh(node, theme))
+    if (showLabels) {
+      group.add(makeTextSprite(node.name, theme.labelColor, theme.labelBg))
+    }
+    return group
+  }, [theme, showLabels])
 
   return (
     <div className={styles.root}>
@@ -203,16 +268,16 @@ export default function GraphExplorer({ data }: { data: GraphData }) {
           width={dims.w}
           height={dims.h}
           backgroundColor={theme.background}
-          nodeLabel="name"
+          nodeLabel={showLabels ? '' : 'name'}
           nodeColor={(n: any) => theme.nodeColors[n.type as PageType] ?? '#F4EDD8'}
           nodeVal={(n: any) => Math.max(1, n.val)}
           nodeRelSize={4}
-          nodeThreeObjectExtend={showLabels}
-          nodeThreeObject={showLabels ? nodeThreeObject : undefined}
+          nodeThreeObjectExtend={false}
+          nodeThreeObject={nodeThreeObject}
           linkColor={() => theme.linkColor}
           linkWidth={theme.linkWidth}
-          linkDirectionalParticles={2}
-          linkDirectionalParticleSpeed={0.003}
+          linkDirectionalParticles={theme.particleCount}
+          linkDirectionalParticleSpeed={theme.particleSpeed}
           linkDirectionalParticleColor={() => theme.particleColor}
           onNodeClick={handleNodeClick}
           enableNodeDrag={false}
