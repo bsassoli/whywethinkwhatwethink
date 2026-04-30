@@ -98,24 +98,45 @@ function ForceCard({ force, isActive, onClick }: {
   )
 }
 
-function ForceDetail({ force }: { force: typeof FORCES[0] }) {
+function ForceModal({ force, index, onClose }: {
+  force: typeof FORCES[0]
+  index: number
+  onClose: () => void
+}) {
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => {
+      document.body.style.overflow = ''
+      document.removeEventListener('keydown', handler)
+    }
+  }, [onClose])
+
   return (
-    <div className={styles.detail}>
-      <div>
-        <div className={styles.detailTitle}>{force.icon} {force.name}</div>
-        <p className={styles.detailBody}>{force.detail}</p>
-      </div>
-      <div>
-        <h4 className={styles.detailEyebrow}>How it shapes us</h4>
-        {force.examples.map((ex, i) => (
-          <div key={i} className={styles.example}>
-            <strong>{ex.title}</strong>
-            {ex.body}
-          </div>
-        ))}
-        <Link href="/explore" className={styles.exploreLink}>
-          Explore related ideas in the graph →
-        </Link>
+    <div
+      className={styles.overlay}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="force-modal-title">
+        <button className={styles.closeBtn} onClick={onClose} aria-label="Close">×</button>
+        <div>
+          <div className={styles.detailEyebrow}>Force {index + 1} of {FORCES.length}</div>
+          <h3 id="force-modal-title" className={styles.detailTitle}>{force.icon} {force.name}</h3>
+          <p className={styles.detailBody}>{force.detail}</p>
+        </div>
+        <div>
+          <h4 className={styles.detailEyebrow}>How it shapes us</h4>
+          {force.examples.map((ex, i) => (
+            <div key={i} className={styles.example}>
+              <strong>{ex.title}</strong>
+              {ex.body}
+            </div>
+          ))}
+          <Link href="/explore" className={styles.exploreLink} onClick={onClose}>
+            Explore in the knowledge graph →
+          </Link>
+        </div>
       </div>
     </div>
   )
@@ -134,8 +155,8 @@ export default function Forces() {
     return () => obs.disconnect()
   }, [])
 
-  const toggle = (id: string) => setActive(prev => prev === id ? null : id)
   const activeForce = FORCES.find(f => f.id === active)
+  const activeIndex = FORCES.findIndex(f => f.id === active)
 
   return (
     <section className={styles.section} id="forces">
@@ -156,11 +177,17 @@ export default function Forces() {
             key={f.id}
             force={f}
             isActive={active === f.id}
-            onClick={() => toggle(f.id)}
+            onClick={() => setActive(f.id)}
           />
         ))}
       </div>
-      {activeForce && <ForceDetail force={activeForce} />}
+      {activeForce && (
+        <ForceModal
+          force={activeForce}
+          index={activeIndex}
+          onClose={() => setActive(null)}
+        />
+      )}
     </section>
   )
 }

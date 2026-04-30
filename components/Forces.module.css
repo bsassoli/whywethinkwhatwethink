@@ -64,7 +64,7 @@
 .card.active::before { transform: scaleX(1); }
 
 .card:hover { background: var(--color-cream-dark); }
-.card.active { background: var(--color-ink); }
+.card.active { background: var(--color-cream-dark); }
 
 .icon {
   font-size: 32px;
@@ -77,17 +77,13 @@
   font-size: 22px;
   font-weight: 700;
   margin-bottom: 8px;
-  transition: color var(--transition-base);
 }
-.active .name { color: var(--color-cream); }
 
 .teaser {
   font-size: 14px;
   line-height: 1.6;
   color: var(--color-warm-gray);
-  transition: color var(--transition-base);
 }
-.active .teaser { color: rgba(244,237,216,0.6); }
 
 .arrow {
   font-size: 20px;
@@ -99,16 +95,77 @@
 .card:hover .arrow,
 .card.active .arrow { transform: translateX(4px); }
 
-.detail {
+/* ── Modal overlay ── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(26, 23, 20, 0.82);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  animation: overlayIn 0.22s ease;
+}
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.modal {
   background: var(--color-ink);
   color: var(--color-cream);
-  padding: 56px var(--space-page);
-  margin-top: 2px;
-  animation: wwt-expandIn 0.35s ease;
+  border-radius: var(--radius-md);
+  padding: 56px 60px;
+  max-width: 860px;
+  width: 100%;
+  max-height: 86vh;
+  overflow-y: auto;
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 60px;
+  animation: modalIn 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(244,237,216,0.12) transparent;
 }
+
+.modal::-webkit-scrollbar { width: 4px; }
+.modal::-webkit-scrollbar-thumb { background: rgba(244,237,216,0.12); border-radius: 2px; }
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.93) translateY(28px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);   }
+}
+
+.closeBtn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(244, 237, 216, 0.08);
+  border: 1px solid rgba(244, 237, 216, 0.2);
+  color: var(--color-cream);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  z-index: 1;
+}
+.closeBtn:hover {
+  background: var(--color-red);
+  border-color: var(--color-red);
+}
+
+/* ── Modal content ── */
 
 .detailTitle {
   font-family: var(--font-serif);
@@ -116,6 +173,7 @@
   font-weight: 700;
   margin-bottom: 24px;
   color: var(--color-cream);
+  line-height: 1.15;
 }
 
 .detailBody {
@@ -151,19 +209,30 @@
 .exploreLink {
   display: inline-flex;
   align-items: center;
+  gap: 8px;
   margin-top: 32px;
+  padding: 12px 24px;
+  background: var(--color-red);
+  color: var(--color-cream);
+  border-radius: var(--radius-sm);
   font-size: var(--text-xs);
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-red);
-  transition: gap var(--transition-base), opacity var(--transition-base);
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
-.exploreLink:hover { opacity: 0.75; }
+.exploreLink:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
 
 @media (max-width: 900px) {
   .section { padding: 64px 24px; }
   .header { grid-template-columns: 1fr; }
   .grid { grid-template-columns: 1fr 1fr; }
-  .detail { grid-template-columns: 1fr; padding: 40px 24px; }
+}
+
+@media (max-width: 640px) {
+  .grid { grid-template-columns: 1fr; }
+  .modal { grid-template-columns: 1fr; padding: 40px 28px; gap: 32px; max-height: 92vh; }
 }
